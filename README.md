@@ -24,6 +24,26 @@ Qdrant listens on `127.0.0.1:6333`. The collection name is `liqa_memory`.
 
 Secrets, credential files, and captures are skipped.
 
+## Jira organization harvest
+
+This login can see the Jira projects it is allowed to open. On 1 Oct 2026 the connected LOLC login could see four projects (FXN, MDP, PF, VV) and 83,672 issues. It cannot see projects that account cannot browse.
+
+Create an API token at https://id.atlassian.com/manage-profile/security/api-tokens and save it only in `C:\LIQA-memory\jira.env`:
+
+```
+JIRA_BASE_URL=https://lolcgroupdev.atlassian.net
+JIRA_EMAIL=you@company.com
+JIRA_API_TOKEN=your-token
+```
+
+Then:
+
+```powershell
+py -3 jira_ingest.py
+```
+
+The script stores users, stories, development issues, QA issues, test cases, descriptions, and comments in the same Qdrant collection. It resumes from `jira-checkpoint.json` if it stops. The account password is not accepted by Jira Cloud.
+
 ## LIQA
 
 The same memory is wired into LIQA as `mcp/memory_rag.py`. These tools call it:
