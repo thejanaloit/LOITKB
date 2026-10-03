@@ -30,12 +30,17 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def create(collection: str | None = None) -> dict:
+def create(collection: str | None = None, tag: str = "") -> dict:
+    from . import guard
+
     cfg = settings()
     name = collection or cfg.collection
+    guard.require_disk("take a backup")
     snap = store.client().create_snapshot(collection_name=name, wait=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     target = cfg.snapshot_dir / f"{name}-{stamp}"
+    if target.exists():
+        target = cfg.snapshot_dir / f"{name}-{stamp}-{tag or 'b'}"
     target.mkdir(parents=True, exist_ok=True)
     snap_file = target / snap.name
     with requests.get(f"{cfg.qdrant_url}/collections/{name}/snapshots/{snap.name}", headers=_headers(), stream=True, timeout=600) as resp:
@@ -54,6 +59,8 @@ def create(collection: str | None = None) -> dict:
         "sha256": _sha256(snap_file),
         "points": store.count(name),
         "server_version": store.server_version(),
+        "schema": cfg.schema_signature,
+        "tag": tag,
     }
     (target / "backup.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     store.client().delete_snapshot(collection_name=name, snapshot_name=snap.name, wait=True)
@@ -61,10 +68,14 @@ def create(collection: str | None = None) -> dict:
     for dest in cfg.extra_offsite_backup:
         try:
             shutil.copytree(target, dest / target.name, dirs_exist_ok=True)
+            copied = dest / target.name / snap_file.name
+            if _sha256(copied) != meta["sha256"]:
+                raise OSError("checksum mismatch after copy")
             offsite.append(str(dest / target.name))
         except OSError as exc:
             offsite.append(f"FAILED {dest}: {exc}")
     meta["offsite"] = offsite
+    (target / "backup.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     meta["path"] = str(target)
     rotate(name)
     return meta
@@ -100,8 +111,19 @@ def rotate(collection: str | None = None) -> None:
         shutil.rmtree(meta["path"], ignore_errors=True)
 
 
-def restore(meta: dict | None = None, collection: str | None = None, target_collection: str | None = None) -> dict:
-    """Upload a snapshot back into Qdrant. target_collection lets the evaluator test a restore without touching live data."""
+def load(path: str | Path) -> dict:
+    meta_file = Path(path) / "backup.json"
+    if not meta_file.is_file():
+        raise RuntimeError(f"{meta_file} not found.")
+    meta = json.loads(meta_file.read_text(encoding="utf-8"))
+    meta["path"] = str(Path(path))
+    return meta
+
+
+def restore(meta: dict | None = None, collection: str | None = None, target_collection: str | None = None, *, confirm: bool = False) -> dict:
+    """Upload a snapshot back into Qdrant. target_collection lets the evaluator test a restore
+    without touching live data. Restoring over the live collection needs confirm=True and takes
+    a pre-restore backup first, so a wrong restore can itself be undone."""
     cfg = settings()
     meta = meta or latest(collection)
     if not meta:
@@ -109,6 +131,21 @@ def restore(meta: dict | None = None, collection: str | None = None, target_coll
     if not verify(meta):
         raise RuntimeError(f"Backup {meta['path']} failed its checksum. Refusing to restore.")
     name = target_collection or meta["collection"]
+    live = target_collection is None or target_collection == cfg.collection
+    pre_restore = None
+    if live:
+        if not confirm:
+            raise RuntimeError(
+                f"Restoring {meta['path']} over the live collection '{name}' replaces every point. "
+                "Re-run with --yes (CLI) or confirm=True. Test first with --into <scratch>."
+            )
+        if meta.get("schema") and meta["schema"] != cfg.schema_signature:
+            raise RuntimeError(f"Backup schema '{meta['schema']}' differs from config '{cfg.schema_signature}'. Restore into a scratch collection or rebuild.")
+        if store.client().collection_exists(name):
+            try:
+                pre_restore = create(name, tag="pre-restore")["path"]
+            except Exception as exc:
+                raise RuntimeError(f"Pre-restore backup failed ({exc}); refusing to overwrite live data without one.") from exc
     snap = Path(meta["path"]) / meta["snapshot"]
     with snap.open("rb") as fh:
         resp = requests.post(
@@ -118,9 +155,18 @@ def restore(meta: dict | None = None, collection: str | None = None, target_coll
             timeout=1800,
         )
     resp.raise_for_status()
-    if not target_collection:
+    if live:
         for extra in (cfg.manifest_db, cfg.memory_journal):
             src = Path(meta["path"]) / extra.name
             if src.exists():
                 shutil.copy2(src, extra)
-    return {"ok": True, "restored_into": name, "points": store.count(name), "from": meta["path"]}
+    points = store.count(name)
+    expected = meta.get("points")
+    return {
+        "ok": expected is None or points == expected,
+        "restored_into": name,
+        "points": points,
+        "expected_points": expected,
+        "from": meta["path"],
+        "pre_restore_backup": pre_restore,
+    }

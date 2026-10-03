@@ -3,12 +3,36 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator
 
 from .config import MAX_FILE_BYTES, SKIP_PARTS, settings
+
+TASK_KEY = re.compile(r"^([A-Z][A-Z0-9]{1,9})-\d+$")
+WORKSPACE_SUFFIXES = {".md", ".txt"}
+
+# Secrets must never become embeddings: a vector store cannot "un-learn" one cleanly.
+_SECRET_PATTERNS = [
+    (re.compile(r"ATATT[A-Za-z0-9_\-=]{20,}"), "[REDACTED_ATLASSIAN_TOKEN]"),
+    (re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._\-]{20,}"), r"\1 [REDACTED]"),
+    (re.compile(r"(?i)\b(password|passwd|pwd|client_secret|api[_-]?key|secret)\b(\s*[:=]\s*)(\"[^\"]+\"|'[^']+'|\S+)"), r"\1\2[REDACTED]"),
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]+?-----END [A-Z ]*PRIVATE KEY-----"), "[REDACTED_PRIVATE_KEY]"),
+]
+
+
+def redact(text: str) -> str:
+    for pattern, repl in _SECRET_PATTERNS:
+        text = pattern.sub(repl, text)
+    return text
+
+
+def acl_for_task(task_key: str) -> list[str]:
+    """Run artifacts inherit the Jira project's permission; only key-less notes are internal."""
+    m = TASK_KEY.match((task_key or "").strip().upper())
+    return [f"jira:project:{m.group(1)}"] if m else ["liqa:internal"]
 
 
 @dataclass
@@ -90,6 +114,50 @@ def iter_flow() -> Iterator[Document]:
         )
 
 
+def _task_key_of(path: Path) -> str:
+    for part in reversed(path.parts):
+        if TASK_KEY.match(part.upper()):
+            return part.upper()
+    return ""
+
+
+def workspace_document(path: Path, phase: str = "analysis") -> Document | None:
+    """One LIQA run artifact (story, map node, test case, bug draft) as a Document."""
+    path = Path(path)
+    key = str(path.resolve()).lower()
+    if not path.is_file() or path.suffix.lower() not in WORKSPACE_SUFFIXES:
+        return None
+    if any(part.lower() in key for part in SKIP_PARTS) or path.stat().st_size > MAX_FILE_BYTES:
+        return None
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if not text.strip():
+        return None
+    task_key = _task_key_of(path)
+    folder = next((p for p in path.parts if p in {"assignedTasks", "knowledgeBase", "UserStories", "ExistingTestCases", "map", "NewTestCases", "bugs"}), "workspace")
+    return Document(
+        doc_id=f"ws:{path.resolve()}",
+        source_type="workspace",
+        title=f"{task_key or 'LIQA'} {folder}: {_title(path, text)}",
+        kind="markdown" if path.suffix.lower() == ".md" else "text",
+        text=text,
+        acl=acl_for_task(task_key),
+        meta={"place": str(path), "source": str(path), "kind_label": folder, "phase": phase, "task_key": task_key},
+    )
+
+
+def iter_workspace() -> Iterator[Document]:
+    seen: set[str] = set()
+    for root, phase in settings().workspace_sources():
+        for path in sorted(root.rglob("*")):
+            k = str(path).lower()
+            if k in seen:
+                continue
+            seen.add(k)
+            doc = workspace_document(path, phase)
+            if doc:
+                yield doc
+
+
 def iter_memories() -> Iterator[Document]:
     journal = settings().memory_journal
     if not journal.exists():
@@ -120,7 +188,7 @@ def journal_memory(text: str, kind: str, phase: str, task_key: str, place: str, 
     """Append-only system of record for runtime memories, so a rebuild never loses them."""
     from .store import now
 
-    body = text.strip()
+    body = redact(text.strip())
     digest = hashlib.sha256(f"{task_key}\n{body}".encode("utf-8")).hexdigest()[:20]
     doc_id = f"mem:{task_key or 'runtime'}:{digest}"
     journal = settings().memory_journal
@@ -128,11 +196,11 @@ def journal_memory(text: str, kind: str, phase: str, task_key: str, place: str, 
     existing = set()
     if journal.exists():
         existing = {json.loads(l)["doc_id"] for l in journal.read_text(encoding="utf-8").splitlines() if l.strip()}
-    row = {"doc_id": doc_id, "text": body, "kind": kind, "phase": phase, "task_key": task_key, "place": place, "acl": acl or ["liqa:internal"], "at": now()}
+    row = {"doc_id": doc_id, "text": body, "kind": kind, "phase": phase, "task_key": task_key, "place": place, "acl": acl or acl_for_task(task_key), "at": now()}
     if doc_id not in existing:
         with journal.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(row, ensure_ascii=False) + "\n")
     return next(d for d in iter_memories() if d.doc_id == doc_id)
 
 
-SOURCES = {"file": iter_files, "flow": iter_flow, "memory": iter_memories}
+SOURCES = {"file": iter_files, "flow": iter_flow, "memory": iter_memories, "workspace": iter_workspace}

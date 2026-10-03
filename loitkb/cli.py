@@ -17,7 +17,11 @@ def main(argv: list[str] | None = None) -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("sync", help="incremental index of all sources")
-    s.add_argument("--source", action="append", choices=["file", "flow", "memory"])
+    s.add_argument("--source", action="append", choices=["file", "flow", "memory", "workspace"])
+    ix = sub.add_parser("index-file", help="index one LIQA workspace file now (stories, maps, tests, bugs)")
+    ix.add_argument("path")
+    ix.add_argument("--phase", default="analysis")
+    sub.add_parser("alerts", help="last 20 local alerts")
     s.add_argument("--force", action="store_true")
     sub.add_parser("rebuild", help="drop and re-index everything")
 
@@ -44,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("backups")
     rs = sub.add_parser("restore")
     rs.add_argument("--into", default=None, help="restore into another collection name (test restore)")
+    rs.add_argument("--from", dest="source", default=None, help="backup folder (default: latest)")
+    rs.add_argument("--yes", action="store_true", help="required to overwrite the live collection")
 
     e = sub.add_parser("eval")
     e.add_argument("--skip-quality", action="store_true")
@@ -105,9 +111,24 @@ def main(argv: list[str] | None = None) -> int:
 
         _print(list_backups())
     elif a.cmd == "restore":
-        from .backup import restore
+        from .backup import load, restore
 
-        _print(restore(target_collection=a.into))
+        res = restore(load(a.source) if a.source else None, target_collection=a.into, confirm=a.yes)
+        _print(res)
+        return 0 if res["ok"] else 4
+    elif a.cmd == "index-file":
+        from pathlib import Path
+
+        from .sources import workspace_document
+        from .sync import index_document
+
+        doc = workspace_document(Path(a.path), a.phase)
+        _print({"path": a.path, "result": index_document(doc, source_type="workspace") if doc else "not indexable"})
+    elif a.cmd == "alerts":
+        from .config import settings
+
+        path = settings().alerts_file
+        print("\n".join(path.read_text(encoding="utf-8").splitlines()[-20:]) if path.exists() else "no alerts")
     elif a.cmd == "eval":
         from .config import settings
         from .evaluator import run
@@ -140,14 +161,20 @@ def monitor() -> int:
 
     log_lines = []
     try:
-        sync(log=log_lines.append)
+        for res in sync(log=log_lines.append):
+            if res.get("deletion_blocked"):
+                log_lines.append(res["deletion_blocked"])
     except Exception as exc:
         log_lines.append(f"sync failed: {exc}")
+        health.send_alert("FAIL", f"LOITKB monitor sync failed: {exc}")
     rep = health.run()
     latest = backup.latest()
     due = not latest or datetime.now(timezone.utc) - datetime.strptime(latest["created_at"], "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc) > timedelta(hours=24)
     if due and rep["overall"] != "FAIL":
-        backup.create()
+        try:
+            backup.create()
+        except Exception as exc:
+            health.send_alert("FAIL", f"LOITKB backup failed: {exc}")
         rep = health.run()
     last_eval = manifest.get_state("last_eval")
     if rep["overall"] != "FAIL" and (not last_eval or datetime.now(timezone.utc) - datetime.fromisoformat(last_eval) > timedelta(hours=24)):

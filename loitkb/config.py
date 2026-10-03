@@ -1,4 +1,4 @@
-﻿"""Settings. Every value can be overridden by an environment variable."""
+"""Settings. Every value can be overridden by an environment variable."""
 from __future__ import annotations
 
 import os
@@ -8,9 +8,39 @@ from pathlib import Path
 PACKAGE_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = PACKAGE_ROOT.parent
 
+# Bump when payload layout, chunking or vector config changes. A mismatch with the
+# value stored in the manifest blocks writes until `python -m loitkb rebuild`.
+SCHEMA_VERSION = "2"
+DEFAULT_DATA_DIR = r"C:\LIQA-memory" if os.name == "nt" else str(Path.home() / ".liqa-memory")
+
+
+def _load_local_env() -> None:
+    """Machine-local secrets (Qdrant API key, principal) live in <data_dir>/loitkb.env,
+    outside every repo. Real environment variables always win."""
+    path = Path(os.environ.get("LOITKB_DATA_DIR", DEFAULT_DATA_DIR)) / "loitkb.env"
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"'))
+
+
+_load_local_env()
+
 
 def _env(name: str, default: str) -> str:
     return os.environ.get(name, default)
+
+
+def _sibling(env_name: str, sibling: str, legacy: str) -> Path:
+    """Env var, else a checkout next to this repo, else the original machine's path."""
+    if os.environ.get(env_name):
+        return Path(os.environ[env_name])
+    candidate = REPO_ROOT.parent / sibling
+    return candidate if candidate.exists() else Path(legacy)
 
 
 def _paths(name: str, default: str) -> list[Path]:
@@ -51,7 +81,7 @@ class Settings:
     collection: str = field(default_factory=lambda: _env("LOITKB_COLLECTION", "loitkb"))
     scratch_collection: str = field(default_factory=lambda: _env("LOITKB_SCRATCH_COLLECTION", "loitkb_eval_scratch"))
 
-    data_dir: Path = field(default_factory=lambda: Path(_env("LOITKB_DATA_DIR", r"C:\LIQA-memory")))
+    data_dir: Path = field(default_factory=lambda: Path(_env("LOITKB_DATA_DIR", DEFAULT_DATA_DIR)))
 
     dense_model: str = field(default_factory=lambda: _env("LOITKB_DENSE_MODEL", "BAAI/bge-small-en-v1.5"))
     dense_size: int = 384
@@ -79,14 +109,24 @@ class Settings:
     abstain_rerank_score: float = float(_env("LOITKB_ABSTAIN_RERANK", "-4.0"))
     abstain_fused_score: float = float(_env("LOITKB_ABSTAIN_FUSED", "0.0"))
 
-    liqa_home: Path = field(default_factory=lambda: Path(_env("LIQA_HOME", r"E:\LIQA")))
-    agency_home: Path = field(default_factory=lambda: Path(_env("LIQA_AGENCY_HOME", r"E:\agency-agents")))
+    liqa_home: Path = field(default_factory=lambda: _sibling("LIQA_HOME", "LIQA", r"E:\LIQA"))
+    agency_home: Path = field(default_factory=lambda: _sibling("LIQA_AGENCY_HOME", "agency-agents", r"E:\agency-agents"))
     extra_offsite_backup: list[Path] = field(default_factory=lambda: _paths("LOITKB_OFFSITE_DIRS", ""))
 
     snapshot_keep: int = int(_env("LOITKB_SNAPSHOT_KEEP", "7"))
     snapshot_max_age_hours: float = float(_env("LOITKB_SNAPSHOT_MAX_AGE_H", "26"))
     min_free_disk_gb: float = float(_env("LOITKB_MIN_FREE_GB", "5"))
+    # Writes (sync, remember, backup) refuse to run below this; health only warns at min_free_disk_gb.
+    hard_min_free_disk_gb: float = field(default_factory=lambda: float(_env("LOITKB_HARD_MIN_FREE_GB", "1")))
+    # A sync that would delete more than this share of a source's documents is treated
+    # as a broken source (wrong path, unmounted drive) and deletes nothing.
+    max_delete_fraction: float = field(default_factory=lambda: float(_env("LOITKB_MAX_DELETE_FRACTION", "0.5")))
+    max_delete_floor: int = field(default_factory=lambda: int(_env("LOITKB_MAX_DELETE_FLOOR", "20")))
     alert_webhook: str = field(default_factory=lambda: _env("LOITKB_ALERT_WEBHOOK", ""))
+    # Consecutive WARN runs before a WARN is alerted (FAIL alerts immediately).
+    warn_alert_after: int = field(default_factory=lambda: int(_env("LOITKB_WARN_ALERT_AFTER", "3")))
+    query_log_max_mb: float = field(default_factory=lambda: float(_env("LOITKB_QUERY_LOG_MAX_MB", "20")))
+    require_api_key: bool = field(default_factory=lambda: _env("LOITKB_REQUIRE_API_KEY", "0") == "1")
 
     llm_base_url: str = field(default_factory=lambda: _env("LOITKB_LLM_BASE_URL", ""))
     llm_model: str = field(default_factory=lambda: _env("LOITKB_LLM_MODEL", ""))
@@ -133,6 +173,30 @@ class Settings:
         return self.data_dir / "reports"
 
     @property
+    def alerts_file(self) -> Path:
+        return self.data_dir / "logs" / "alerts.jsonl"
+
+    @property
+    def schema_signature(self) -> str:
+        return f"{SCHEMA_VERSION}|{self.dense_model}|{self.dense_size}|{self.sparse_model}"
+
+    def workspace_sources(self) -> list[tuple[Path, str]]:
+        """(folder, phase) for LIQA run artifacts: harvest, stories, maps, test cases, bugs."""
+        folders = {
+            "assignedTasks": "planning",
+            "knowledgeBase": "analysis",
+            "UserStories": "analysis",
+            "ExistingTestCases": "analysis",
+            "map": "analysis",
+            "NewTestCases": "design",
+            "bugs": "execution",
+        }
+        root = self.liqa_home / "workspace"
+        if not root.exists():
+            return []
+        return [(run / name, phase) for run in sorted(root.iterdir()) if run.is_dir() for name, phase in folders.items() if (run / name).is_dir()]
+
+    @property
     def golden_set(self) -> Path:
         return Path(_env("LOITKB_GOLDEN", str(REPO_ROOT / "eval" / "golden.jsonl")))
 
@@ -151,7 +215,7 @@ class Settings:
         ]
 
 
-SKIP_PARTS = ("__pycache__", "node_modules", "secrets", ".env", "creds", "password", "captures", ".git")
+SKIP_PARTS = ("__pycache__", "node_modules", "secrets", ".env", "creds", "password", "captures", ".git", "pw-edge-profile", ".chrome-")
 MAX_FILE_BYTES = 1_500_000
 
 

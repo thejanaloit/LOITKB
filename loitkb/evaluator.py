@@ -355,12 +355,12 @@ def run(skip_quality: bool = False) -> dict:
     (cfg.reports_dir / "latest.md").write_text(markdown(report), encoding="utf-8")
     manifest.set_state("last_eval", report["at"])
     if report["verdict"] != "INDUSTRY-GRADE PASS":
-        health.notify(f"LOITKB evaluator FAIL: {passed}/{len(layers)} layers")
+        health.send_alert("FAIL", f"LOITKB evaluator FAIL: {passed}/{len(layers)} layers")
     return report
 
 
 def markdown(report: dict) -> str:
-    lines = [f"# LOITKB evaluator — {report['verdict']}", "", f"Run at {report['at']} · {report['passed']}/{report['total']} layers · {report['seconds']} s", "",
+    lines = [f"# LOITKB evaluator â€” {report['verdict']}", "", f"Run at {report['at']} Â· {report['passed']}/{report['total']} layers Â· {report['seconds']} s", "",
              "| Layer | Status | Key evidence |", "| --- | --- | --- |"]
     for l in report["layers"]:
         ev = {k: v for k, v in (l["evidence"] or {}).items() if k not in ("trace", "samples", "misses")}
@@ -376,5 +376,5 @@ def markdown(report: dict) -> str:
         lines += ["", f"Abstention: accuracy {ab.get('abstain_accuracy')} on {ab.get('unanswerable')} unanswerable questions; false-abstain rate {ab.get('false_abstain_rate')}."]
         misses = (q.get("hybrid+rerank") or {}).get("misses") or []
         if misses:
-            lines += ["", "## Misses (production pipeline)", ""] + [f"- {m['id']}: {m['question']} → got {m['got']}" for m in misses]
+            lines += ["", "## Misses (production pipeline)", ""] + [f"- {m['id']}: {m['question']} â†’ got {m['got']}" for m in misses]
     return "\n".join(lines) + "\n"

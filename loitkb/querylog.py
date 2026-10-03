@@ -8,9 +8,28 @@ from datetime import datetime, timedelta, timezone
 from .config import settings
 
 
+KEEP_ROTATED = 3
+
+
+def _rotate(path, max_mb: float) -> None:
+    if not path.exists() or path.stat().st_size < max_mb * 1e6:
+        return
+    for i in range(KEEP_ROTATED, 0, -1):
+        older = path.with_suffix(f".{i}.jsonl")
+        if i == KEEP_ROTATED and older.exists():
+            older.unlink()
+        newer = path if i == 1 else path.with_suffix(f".{i - 1}.jsonl")
+        if newer.exists():
+            newer.replace(older)
+
+
 def record(result: dict) -> None:
     path = settings().query_log
     path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        _rotate(path, settings().query_log_max_mb)
+    except OSError:
+        pass
     hits = result.get("hits") or []
     row = {
         "at": datetime.now(timezone.utc).isoformat(),

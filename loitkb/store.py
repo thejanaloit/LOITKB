@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+import warnings
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any, Iterable
@@ -27,6 +28,9 @@ def client():
     from qdrant_client import QdrantClient
 
     cfg = settings()
+    if cfg.qdrant_url.startswith(("http://127.0.0.1", "http://localhost")):
+        # Qdrant binds to loopback only; plain HTTP never leaves the machine.
+        warnings.filterwarnings("ignore", message="Api key is used with an insecure connection")
     return QdrantClient(url=cfg.qdrant_url, api_key=cfg.qdrant_api_key or None, timeout=120)
 
 
