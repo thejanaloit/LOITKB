@@ -1,0 +1,48 @@
+{"id": "g01", "question": "How many failed approaches are needed before something can be labelled a real bug?", "expected_sources": ["HONESTY-20-AND-3.md", "SPEED-PLAYBOOK.md", "liqa-perfect-100"]}
+{"id": "g02", "question": "What happens in the triple revalidate step after the honesty verdict?", "expected_sources": ["HONESTY-20-AND-3.md"]}
+{"id": "g03", "question": "Which columns are allowed in Sigiri manual test steps?", "expected_sources": ["SIGIRI-MANUAL-STEPS-GUARD.md", "SIGIRI-PF-59194-XRAY-GOLD.md", "XRAY-UI-RPA.md", "packaging/lolc/LAWS.md", "lolc-qa-environment", "LOLC-QA-ENVIRONMENT.md"]}
+{"id": "g04", "question": "How do I import manual steps into an Xray test without Xray API keys?", "expected_sources": ["XRAY-UI-RPA.md", "SIGIRI-MANUAL-STEPS-GUARD.md", "SPEED-PLAYBOOK.md"]}
+{"id": "g05", "question": "Should I ever use the Attachments panel when uploading Xray CSV steps?", "expected_sources": ["XRAY-UI-RPA.md", "SIGIRI-MANUAL-STEPS-GUARD.md", "SPEED-PLAYBOOK.md"]}
+{"id": "g06", "question": "What CDP address does the Xray Chrome automation attach to?", "expected_sources": ["XRAY-UI-RPA.md", "SPEED-PLAYBOOK.md"]}
+{"id": "g07", "question": "How should test titles be written on the FusionX PF project?", "expected_sources": ["packaging/lolc/TITLES.md", "LOLC-QA-ENVIRONMENT.md", "lolc-qa-environment", "packaging/lolc/LAWS.md"]}
+{"id": "g08", "question": "Are bracket [FP] Validate that titles allowed on new PF tests?", "expected_sources": ["packaging/lolc/TITLES.md", "LOLC-QA-ENVIRONMENT.md", "lolc-qa-environment", "packaging/lolc/LAWS.md", "SIGIRI"]}
+{"id": "g09", "question": "What is the title format for a TestCrafters bug in Kenya UAT?", "expected_sources": ["packaging/lolc/BUGS.md", "LOLC-QA-ENVIRONMENT.md", "lolc-qa-environment"]}
+{"id": "g10", "question": "What sections must the body of a LOLC bug ticket contain?", "expected_sources": ["packaging/lolc/BUGS.md", "packaging/lolc/PROCESS.md", "DEFECT-REPORTING.md"]}
+{"id": "g11", "question": "Who are the maker and checker users in the Kenya UAT environment?", "expected_sources": ["packaging/lolc/ENVIRONMENTS.md", "LOLC-QA-ENVIRONMENT.md", "lolc-qa-environment"]}
+{"id": "g12", "question": "What is the Kenya UAT FusionX URL and tenant tag?", "expected_sources": ["packaging/lolc/ENVIRONMENTS.md", "LOLC-QA-ENVIRONMENT.md", "lolc-qa-environment"]}
+{"id": "g13", "question": "Who writes the QA stories and who writes the Xray tests in LOLC?", "expected_sources": ["packaging/lolc/PROCESS.md", "packaging/lolc/PEOPLE.md", "LOLC-QA-ENVIRONMENT.md", "lolc-qa-environment"]}
+{"id": "g14", "question": "Which test cases did Sigiri Jayasekara write?", "expected_sources": ["packaging/lolc/PEOPLE.md"]}
+{"id": "g15", "question": "How is a bug closed after the developer fixes it in UAT?", "expected_sources": ["packaging/lolc/PROCESS.md", "LOLC-QA-ENVIRONMENT.md", "lolc-qa-environment"]}
+{"id": "g16", "question": "How many data rows and screenshots must a Book1 SHARE workbook have?", "expected_sources": ["BOOK1-SHARE-GOLD-EVERY-TASK.md", "PERFECT-100-PF-59486-GOLD.md", "QUALITY-CONTRACT.md", "liqa-perfect-100", "BOOK1"]}
+{"id": "g17", "question": "What must the Simple explanation column of Book1 start with?", "expected_sources": ["BOOK1-SHARE-GOLD-EVERY-TASK.md", "BOOK1-ALL-FIELDS-ENGLISH-LAW.md", "BOOK1-ENGLISH.md"]}
+{"id": "g18", "question": "What are the columns of the Book1 Excel report?", "expected_sources": ["BOOK1"]}
+{"id": "g19", "question": "Which Jira issue is the Perfect-100 reference run?", "expected_sources": ["PERFECT-100-PF-59486-GOLD.md", "QUALITY-CONTRACT.md", "liqa-perfect-100", "SPEED-PLAYBOOK.md", "SAME-LEVEL-ACCEPTANCE.md"]}
+{"id": "g20", "question": "What does the Perfect-100 checklist require for the ISTQB phases?", "expected_sources": ["PERFECT-100-PF-59486-GOLD.md", "liqa-perfect-100", "QUALITY-CONTRACT.md"]}
+{"id": "g21", "question": "How must bug proof screenshots be attached to a Jira bug?", "expected_sources": ["JIRA-BUG-PROOF-ATTACH-RPA.md", "liqa-perfect-100", "DEFECT-REPORTING.md", "PERFECT-100-PF-59486-GOLD.md"]}
+{"id": "g22", "question": "What should I do before filing a new bug to avoid duplicates?", "expected_sources": ["SPEED-PLAYBOOK.md", "liqa-perfect-100", "PERFECT-100-PF-59486-GOLD.md", "packaging/lolc"]}
+{"id": "g23", "question": "What does LIQA do when an SMS OTP or image CAPTCHA appears?", "expected_sources": ["CAPTCHA-AND-HUMAN-GATE.md", "BANK-FAQ.md", "DEVICE-TEAMS-REMOTE-CONTROL.md", "LOLC-QA-ENVIRONMENT.md", "packaging/lolc/ENVIRONMENTS.md"]}
+{"id": "g24", "question": "Are captcha solving farms like 2captcha allowed?", "expected_sources": ["CAPTCHA-AND-HUMAN-GATE.md", "NETWORK-POLICY.md"]}
+{"id": "g25", "question": "Do UAT screenshots leave the bank network in the bank SKU?", "expected_sources": ["BANK-FAQ.md", "DATA-RESIDENCY.md", "THREAT-MODEL.md", "ADR-0003"]}
+{"id": "g26", "question": "What are the bank, hybrid and cloud-brain data residency modes?", "expected_sources": ["DATA-RESIDENCY.md", "ADR-0003", "BANK-FAQ.md"]}
+{"id": "g27", "question": "Why does the Worker only open outbound connections to Control?", "expected_sources": ["ADR-0002", "DEPLOY-WORKER-VM.md", "NETWORK-POLICY.md", "ARCHITECTURE.md", "INDUSTRY-PRODUCT.md"]}
+{"id": "g28", "question": "What is the minimum vCPU and OS for a LIQA Worker VM?", "expected_sources": ["DEPLOY-WORKER-VM.md"]}
+{"id": "g29", "question": "What are the responsibilities of the QA Gate Lead and the QA Sign-off Lead?", "expected_sources": ["OPS-MODEL-2QA.md", "OPS-2QA-ROSTER.md"]}
+{"id": "g30", "question": "How long are PII captures retained before rotation?", "expected_sources": ["RETENTION.md"]}
+{"id": "g31", "question": "Which hosts are on the Worker egress allowlist?", "expected_sources": ["NETWORK-POLICY.md"]}
+{"id": "g32", "question": "What is the human gate SLA before a step becomes BLOCKED?", "expected_sources": ["SLA.md"]}
+{"id": "g33", "question": "Is the brain tied to one model vendor?", "expected_sources": ["ADR-0003"]}
+{"id": "g34", "question": "Can LIQA also do general PC tasks like shopping with my own credentials?", "expected_sources": ["ADR-0005", "CAPTCHA-AND-HUMAN-GATE.md"]}
+{"id": "g35", "question": "What does SBTM session-based test management involve?", "expected_sources": ["SBTM.md", "INDUSTRY-MANUAL-QA-METHODS.md"]}
+{"id": "g36", "question": "Explain the YouTube analogy for manual QA.", "expected_sources": ["YOUTUBE-ANALOGY-AND-BUG-MISSION.md"]}
+{"id": "g37", "question": "What is the Eyes Brain Hands loop for device control?", "expected_sources": ["DEVICE-TEAMS-REMOTE-CONTROL.md", "ARCHITECTURE.md", "YOUTUBE-ANALOGY", "QUALITY-CONTRACT.md", "INDUSTRY-PRODUCT.md"]}
+{"id": "g38", "question": "What are the steps of Jira intake for an assigned task?", "expected_sources": ["jira-intake.md", "laws.py", "MANUALQA-10-STEPS.md"]}
+{"id": "g39", "question": "Why should Excel be minimized before capturing proof?", "expected_sources": ["SPEED-PLAYBOOK.md", "QUALITY-CONTRACT.md"]}
+{"id": "g40", "question": "What threats does the threat model list for the live view?", "expected_sources": ["THREAT-MODEL.md"]}
+{"id": "u01", "question": "What was the price of bitcoin in March 2015?", "expected_sources": []}
+{"id": "u02", "question": "Give me a recipe for chicken biryani.", "expected_sources": []}
+{"id": "u03", "question": "Who won the 1996 cricket world cup final?", "expected_sources": []}
+{"id": "u04", "question": "How do I change the oil in a Toyota Corolla?", "expected_sources": []}
+{"id": "u05", "question": "What is the capital city of Australia?", "expected_sources": []}
+{"id": "u06", "question": "Recommend a good sci-fi novel to read this weekend.", "expected_sources": []}
+{"id": "u07", "question": "How tall is Mount Everest in feet?", "expected_sources": []}
+{"id": "u08", "question": "What is the best way to grow tomatoes on a balcony?", "expected_sources": []}

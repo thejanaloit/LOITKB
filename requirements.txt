@@ -1,2 +1,6 @@
-qdrant-client>=1.12
-fastembed>=0.4
+qdrant-client==1.19.1
+fastembed>=0.8,<0.9
+requests>=2.32
+pypdf>=6.0
+python-docx>=1.1
+pytest>=8.0

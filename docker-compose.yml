@@ -1,8 +1,20 @@
+# Qdrant on a Docker-managed named volume. Do not switch this to a Windows
+# folder bind mount: Qdrant's memory-mapped storage can be lost on restart.
 services:
   qdrant:
-    image: qdrant/qdrant:v1.15.4
+    image: qdrant/qdrant:v1.19.1
+    container_name: loitkb-qdrant
+    restart: unless-stopped
     ports:
       - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    environment:
+      QDRANT__SERVICE__API_KEY: ${LOITKB_QDRANT_API_KEY:-}
+      QDRANT__TELEMETRY_DISABLED: "true"
     volumes:
-      - ./data/qdrant:/qdrant/storage
-    restart: unless-stopped
+      - loitkb_qdrant:/qdrant/storage
+      - loitkb_snapshots:/qdrant/snapshots
+
+volumes:
+  loitkb_qdrant:
+  loitkb_snapshots:

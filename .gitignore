@@ -1,7 +1,14 @@
 data/
 models/
+snapshots/
+reports/
 __pycache__/
+.pytest_cache/
 .env
-jira.env
+*.env
 jira-checkpoint.json
+access-policy.json
+memories.jsonl
+*.sqlite
+*.snapshot
 *.pyc
